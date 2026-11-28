@@ -7,6 +7,8 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-28
+
 ### Added
 
 - README with screenshots, installation steps, a usage guide and keyboard shortcuts.
@@ -55,5 +57,6 @@ First public release.
 - Slim libmpv build from pinned, checksummed sources; a DMG under 50 MB for Apple Silicon and
   macOS 13 or newer; and a GitHub Actions release workflow.
 
-[Unreleased]: https://github.com/dizzpy/Popcorn/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dizzpy/Popcorn/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/dizzpy/Popcorn/compare/v0.1.0...v0.2.1
 [0.1.0]: https://github.com/dizzpy/Popcorn/releases/tag/v0.1.0
