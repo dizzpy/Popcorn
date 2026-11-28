@@ -13,6 +13,19 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Contributing guide, security policy, code of conduct, and issue and pull request templates.
 - Full reference of commands, events and data types in `docs/API.md`.
 - Rust crate licenses in `docs/THIRD_PARTY.md`.
+- **Media keys and Now Playing:** the play/pause key, headphone controls and the Control Center
+  widget control playback, which shows the title, episode, poster and progress.
+- **Menu bar** with Settings, Rescan Library, navigation, a Playback menu, theme switching, and the
+  standard Edit and Window menus.
+
+### Changed
+
+- The player's controls and title now hide when the mouse rests, also while paused, and at once
+  when the mouse leaves the window. Subtitles move up while the controls are shown.
+- The DMG opens a styled install window: drag Popcorn onto Applications, with first-launch help.
+- A simpler welcome screen: choose or drop the media folder, watch the scan, and add a TMDB key
+  only if you want to.
+- On Home, the featured text no longer runs into the film strip in smaller windows.
 
 ## [0.1.0] - 2026-11-26
 
