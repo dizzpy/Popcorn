@@ -4,6 +4,7 @@ mod error;
 mod jobs;
 mod library;
 mod logger;
+mod menu;
 mod player;
 mod progress;
 mod settings;
@@ -19,7 +20,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(player::PlayerHost::default())
-        .on_window_event(player::on_window_event)
+        .on_window_event(|window, event| {
+            player::on_window_event(window, event);
+            commands::on_window_event(window, event);
+        })
         .setup(|app| {
             let data_dir = app.path().data_dir()?.join("Popcorn");
             #[cfg(debug_assertions)]
@@ -34,6 +38,10 @@ pub fn run() {
             // Now, as well as after the scan, which fails if the folder is away.
             jobs::queue_metadata(app.handle());
             jobs::start_scan(app.handle());
+            if let Err(error) = menu::install(app.handle()) {
+                log::warn!("could not build the menu bar: {error}");
+            }
+            player::install(app.handle());
             #[cfg(debug_assertions)]
             player::smoke::start(app.handle());
             Ok(())
@@ -71,6 +79,7 @@ pub fn run() {
             player::commands::player_add_subtitle,
             player::commands::player_toggle_fullscreen,
             player::commands::player_exit_fullscreen,
+            player::commands::player_set_subtitle_lift,
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Popcorn")

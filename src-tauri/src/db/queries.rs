@@ -135,6 +135,9 @@ pub struct PlaybackItem {
     pub season: Option<u32>,
     pub episode: Option<u32>,
     pub episode_name: Option<String>,
+    /// The local poster file, for the Now Playing widget.
+    #[serde(skip)]
+    pub poster: Option<String>,
     /// The following episode in season order, if there is one.
     pub next: Option<NextEpisode>,
 }
@@ -412,6 +415,7 @@ pub fn playback_item(conn: &Connection, file_id: i64) -> AppResult<PlaybackItem>
         title_id,
         path,
         title: details.summary.title,
+        poster: details.summary.poster_path,
         season: None,
         episode: None,
         episode_name: None,

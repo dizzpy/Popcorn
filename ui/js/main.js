@@ -6,13 +6,20 @@ import { state } from './state.js';
 import { currentTheme, syncWindowTheme, THEME_CHANGED, toggleTheme } from './theme.js';
 import { moveFocus } from './components/keyboard-nav.js';
 import { scanStatus } from './components/scan-status.js';
-import { toastError } from './components/toast.js';
+import { toast, toastError } from './components/toast.js';
 import detailsMovie from './views/details-movie.js';
 import detailsShow from './views/details-show.js';
 import home from './views/home.js';
 import movies from './views/movies.js';
 import onboarding from './views/onboarding.js';
-import { closePlayer, initPlayer, openPlayer, playerActive, playerKey } from './views/player.js';
+import {
+  closePlayer,
+  initPlayer,
+  openPlayer,
+  playerActive,
+  playerCommand,
+  playerKey,
+} from './views/player.js';
 import search from './views/search.js';
 import settings from './views/settings.js';
 import shows from './views/shows.js';
@@ -327,6 +334,30 @@ function onKeyUp(event) {
   if (playerActive() && event.key === ' ') event.preventDefault();
 }
 
+/** Items of the native menu bar (see src-tauri/src/menu.rs). */
+function onMenuCommand(id) {
+  if (id === 'theme') {
+    toggleTheme();
+    return;
+  }
+  // While a video plays, only the Playback menu applies.
+  if (playerActive()) {
+    if (id === 'back') closePlayer();
+    else playerCommand(id);
+    return;
+  }
+  if (document.querySelector('dialog[open]') || current()?.name === 'onboarding') return;
+  if (['home', 'movies', 'shows', 'settings'].includes(id)) navigate(id);
+  else if (id === 'search') focusSearch();
+  else if (id === 'back') back();
+  else if (id === 'rescan') {
+    api
+      .rescan()
+      .then(() => toast('Rescan started.'))
+      .catch(toastError);
+  }
+}
+
 /** The header button shows the theme it switches to. */
 function paintThemeToggle() {
   const dark = currentTheme() === 'dark';
@@ -369,6 +400,7 @@ async function boot() {
       listen('library://updated', libraryUpdated),
       listen('scan://progress', onScan),
       initPlayer({ onClosed: refresh }),
+      listen('menu://command', onMenuCommand),
     ]);
     const [saved, info] = await Promise.all([api.getSettings(), api.appInfo()]);
     state.settings = saved;

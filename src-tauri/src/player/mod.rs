@@ -18,6 +18,11 @@ mod keys;
 mod model;
 mod mpv;
 #[cfg(target_os = "macos")]
+mod now_playing;
+#[cfg(not(target_os = "macos"))]
+#[path = "now_playing_unsupported.rs"]
+mod now_playing;
+#[cfg(target_os = "macos")]
 mod objc;
 mod options;
 mod session;
@@ -55,7 +60,13 @@ pub trait Player {
     fn set_subtitle(&self, track_id: Option<i64>) -> AppResult<()>;
     /// Loads a subtitle file and selects it.
     fn add_subtitle(&self, path: &str) -> AppResult<()>;
+    /// Raises subtitles above controls that cover `fraction` of the height.
+    fn set_subtitle_lift(&self, fraction: f64) -> AppResult<()>;
 }
+
+/// mpv's default bottom margin, in its scaled pixels (720 to the height).
+const SUBTITLE_MARGIN: f64 = 22.0;
+const SCALED_HEIGHT: f64 = 720.0;
 
 fn finite(value: f64) -> AppResult<f64> {
     if value.is_finite() {
@@ -106,6 +117,38 @@ impl Player for Mpv {
             log::warn!("could not load a subtitle file: {error}");
             AppError::Player("that subtitle file could not be loaded".into())
         })
+    }
+
+    fn set_subtitle_lift(&self, fraction: f64) -> AppResult<()> {
+        let lift = finite(fraction)?.clamp(0.0, 0.5) * SCALED_HEIGHT;
+        let margin = (SUBTITLE_MARGIN + lift).round();
+        self.command_async(&["set", "sub-margin-y", &margin.to_string()])
+    }
+}
+
+/// Sets up the parts of the player that live as long as the app. Call on the
+/// main thread.
+pub fn install(app: &AppHandle) {
+    now_playing::install(app);
+}
+
+fn now_playing_info(item: &PlaybackItem) -> now_playing::Info {
+    let episode = match (item.season, item.episode) {
+        (Some(season), Some(episode)) => {
+            let code = format!("S{season} E{episode}");
+            Some(match &item.episode_name {
+                Some(name) => format!("{code} · {name}"),
+                None => code,
+            })
+        }
+        _ => None,
+    };
+    now_playing::Info {
+        file_id: item.file_id,
+        title: item.title.clone(),
+        subtitle: episode,
+        poster: item.poster.clone(),
+        has_next: item.next.is_some(),
     }
 }
 
@@ -186,6 +229,8 @@ impl PlayerHost {
             return Err(error);
         }
         *lock(&self.current) = Some(session);
+        now_playing::begin(now_playing_info(&item));
+        crate::menu::set_playing(app, true, item.next.is_some());
         log::info!("playing file {file_id} (embedded: {embedded})");
         Ok(Opened { embedded, item })
     }
@@ -227,6 +272,8 @@ impl PlayerHost {
                 muted: mute,
             };
         }
+        now_playing::end(session.file_id);
+        crate::menu::set_playing(app, false, false);
         session.close(app, on_main_thread)
     }
 

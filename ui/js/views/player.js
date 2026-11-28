@@ -59,6 +59,10 @@ export function initPlayer(options) {
       else s.ui.wake();
     }),
     route('player://error', (s, payload) => toast(payload.message, { error: true })),
+    // Media keys and Control Center; Rust handles play, pause and seeking.
+    route('player://remote', (s, payload) => {
+      if (payload.action === 'next') playNext(s);
+    }),
     route('player://closed', (s, payload) => {
       // Closed from the native side; ignore reports about an earlier file.
       if (!s.loading && payload.file_id === s.item?.file_id) teardown(s);
@@ -318,6 +322,35 @@ export function playerKey(event) {
   if (!s.loading) action();
 }
 
+/** The Playback menu. Returns whether the command was one of its items. */
+export function playerCommand(id) {
+  const s = session;
+  if (!s) return false;
+  const actions = {
+    play_pause: () => togglePause(s),
+    skip_back: () => seekBy(s, -10),
+    skip_forward: () => seekBy(s, 10),
+    next_episode: () => playNext(s),
+    volume_up: () => {
+      setVolume(s, sound.volume + VOLUME_STEP);
+      s.ui.flash(`Volume ${sound.volume}%`);
+    },
+    volume_down: () => {
+      setVolume(s, sound.volume - VOLUME_STEP);
+      s.ui.flash(`Volume ${sound.volume}%`);
+    },
+    mute: toggleMute,
+    next_subtitle: () => cycleTrack(s, 'subtitles'),
+    next_audio: () => cycleTrack(s, 'audio'),
+    load_subtitle: () => run(api.playerAddSubtitle()),
+    close_player: closePlayer,
+  };
+  const action = actions[id];
+  if (!action) return false;
+  if (!s.loading || id === 'close_player') action();
+  return true;
+}
+
 function buildUi(s) {
   let idleTimer;
   let flashTimer;
@@ -325,6 +358,9 @@ function buildUi(s) {
   let scrubbing = null;
   let overControls = false;
   let pointer = '';
+  /** What mpv was last told, as a share of the height; null forces a send. */
+  let lift = null;
+  let shownStatus = '';
 
   const title = h('span', { class: 'p-title' });
   const subtitle = h('span', { class: 'p-subtitle' });
@@ -390,13 +426,9 @@ function buildUi(s) {
     back,
     h('div', {}, title, subtitle),
   );
-  const bottom = h(
+  const controls = h(
     'div',
-    { class: 'p-ui p-bottom' },
-    seek,
-    h(
-      'div',
-      { class: 'p-controls' },
+    { class: 'p-controls' },
       playButton,
       rewindButton,
       forwardButton,
@@ -407,8 +439,8 @@ function buildUi(s) {
       subtitleButton,
       audioButton,
       fullscreenButton,
-    ),
   );
+  const bottom = h('div', { class: 'p-ui p-bottom' }, seek, controls);
 
   const spinner = h('div', { class: 'p-spinner', role: 'status', 'aria-label': 'Loading' });
   const flashBox = h('div', { class: 'p-flash', role: 'status', hidden: true });
@@ -473,27 +505,51 @@ function buildUi(s) {
     countdownCard,
   );
 
-  // The controls stay while they are in use or there is nothing playing.
-  const pinned = () =>
-    menu || scrubbing !== null || overControls || s.loading || s.ended || s.status === 'paused';
+  // The controls stay while they are in use, while loading and at the end.
+  // A pause alone does not keep them: like other Mac players, they go once
+  // the mouse rests.
+  const pinned = () => menu || scrubbing !== null || overControls || s.loading || s.ended;
 
+  /** Keeps subtitles above the controls while they are shown. */
+  function liftSubtitles() {
+    if (s.embedded !== true || s.loading) return;
+    const height = el.clientHeight;
+    const shown = !el.classList.contains('idle') && height > 0;
+    const covered = shown ? height - seek.getBoundingClientRect().top : 0;
+    // Rounded, so that small layout changes do not each cost a call.
+    const next = Math.round((Math.max(0, covered) / (height || 1)) * 200) / 200;
+    if (next === lift) return;
+    lift = next;
+    api.playerSetSubtitleLift(next).catch(() => {});
+  }
+
+  function hide() {
+    clearTimeout(idleTimer);
+    if (pinned()) {
+      hideLater();
+      return;
+    }
+    el.classList.add('idle');
+    liftSubtitles();
+    // A hidden control must not keep the focus.
+    if (top.contains(document.activeElement) || bottom.contains(document.activeElement)) {
+      el.focus({ preventScroll: true });
+    }
+  }
   function hideLater() {
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-      if (pinned()) hideLater();
-      else {
-        el.classList.add('idle');
-        // A hidden control must not keep the focus.
-        if (top.contains(document.activeElement) || bottom.contains(document.activeElement)) {
-          el.focus({ preventScroll: true });
-        }
-      }
-    }, IDLE_MS);
+    idleTimer = setTimeout(hide, IDLE_MS);
   }
   function wake() {
     el.classList.remove('idle');
+    liftSubtitles();
     hideLater();
   }
+  const onResize = () => {
+    lift = null;
+    liftSubtitles();
+  };
+  window.addEventListener('resize', onResize);
   el.addEventListener('pointermove', (event) => {
     // WebKit also reports a move when only the content under the cursor changes.
     const position = `${event.screenX},${event.screenY}`;
@@ -502,14 +558,21 @@ function buildUi(s) {
     wake();
   });
   el.addEventListener('pointerdown', wake);
+  // Leaving the window hides the controls at once, as in QuickTime.
+  el.addEventListener('pointerleave', () => {
+    overControls = false;
+    if (scrubbing === null) hide();
+  });
   el.addEventListener('focusin', (event) => {
     if (event.target !== el) wake();
   });
-  for (const bar of [top, bottom, menuBox]) {
-    bar.addEventListener('pointerenter', () => {
+  // Only the controls themselves count, not the shaded space around them, or
+  // a mouse resting low on the video would keep them forever.
+  for (const part of [back, seek, controls, menuBox, countdownCard]) {
+    part.addEventListener('pointerenter', () => {
       overControls = true;
     });
-    bar.addEventListener('pointerleave', () => {
+    part.addEventListener('pointerleave', () => {
       overControls = false;
     });
   }
@@ -694,7 +757,12 @@ function buildUi(s) {
     volume.value = String(sound.volume);
     volume.style.setProperty('--level', `${sound.volume}%`);
     spinner.hidden = !(s.loading || (s.status === 'buffering' && s.embedded && !s.ended));
-    if (s.status === 'paused' || s.ended) el.classList.remove('idle');
+    // Pausing shows the controls; they hide again once the mouse rests.
+    const shown = s.ended ? 'ended' : s.status;
+    if (shown !== shownStatus) {
+      shownStatus = shown;
+      if (shown === 'paused' || shown === 'ended') wake();
+    }
   }
 
   function countdown() {
@@ -732,6 +800,9 @@ function buildUi(s) {
     el.classList.toggle('opening', s.embedded === null);
     external.hidden = !separate;
     bottom.hidden = separate;
+    // A new file has a new mpv core, with the default margin.
+    lift = null;
+    liftSubtitles();
     time();
     status();
     countdown();
@@ -769,6 +840,7 @@ function buildUi(s) {
     destroy: () => {
       clearTimeout(idleTimer);
       clearTimeout(flashTimer);
+      window.removeEventListener('resize', onResize);
       el.remove();
     },
   };

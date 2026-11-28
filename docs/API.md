@@ -136,6 +136,7 @@ stores nothing, so cached data is never replaced by a partial result.
 | `player_add_subtitle` | | | Opens a native file picker (`.srt`, `.ass`, `.ssa`, `.vtt`) and loads the chosen file. |
 | `player_toggle_fullscreen` | | `boolean` | The new fullscreen state. |
 | `player_exit_fullscreen` | | `boolean` | `true` if the window was fullscreen. |
+| `player_set_subtitle_lift` | `fraction: number` | `null` | Raises subtitles above controls that cover this share of the window height (0 to 0.5); 0 puts them back. |
 
 The UI decides where to resume (usually `TitleDetails.play.resume_position`) and passes it as
 `startAt`.
@@ -331,6 +332,9 @@ Defined in [`player/model.rs`](../src-tauri/src/player/model.rs).
 | `player://ended` | `{ file_id: number }` | At the end of a file. The last frame stays on screen. |
 | `player://error` | `{ message: string }` | A playback error, as a user-facing message. |
 | `player://closed` | `{ file_id: number }` | Playback was closed from the native side (the fallback window). |
+| `player://remote` | `{ action: "next" }` | A media key or Control Center asked for the next episode. Play, pause and seeking are handled in Rust. |
+| `onboarding://drop` | `{ over: boolean, path: string \| null, error: string \| null }` | Only before onboarding is finished: something is dragged over the window (`over`), or a dropped folder became the media folder (`path`) and is being scanned. |
+| `menu://command` | `string` | A menu bar item was chosen; the payload is its id (see `src-tauri/src/menu.rs`). |
 
 ## Embedded playback in the UI
 
