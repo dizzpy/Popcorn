@@ -89,7 +89,7 @@ img { display: block; max-width: 100%; }
 .chip[aria-pressed='true'] { background: var(--kernel); border-color: var(--kernel); color: var(--velvet); font-weight: 600; }
 .seg { display: inline-flex; flex-wrap: wrap; padding: 3px; border-radius: 999px; background: var(--curtain); border: 1px solid var(--line); }
 .seg button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--smoke); font-size: 14px; cursor: pointer; }
-.seg button[aria-pressed='true'] { background: var(--seat); color: var(--kernel); font-weight: 600; }
+.seg button:is([aria-pressed='true'], [aria-checked='true']) { background: var(--seat); color: var(--kernel); font-weight: 600; }
 
 .select-wrap { position: relative; display: inline-flex; }
 .select-wrap::after { content: ''; position: absolute; right: 13px; top: 12px; width: 12px; height: 12px; background: var(--smoke); pointer-events: none; -webkit-mask: url('../img/chevron.svg') center / contain no-repeat; mask: url('../img/chevron.svg') center / contain no-repeat; }
