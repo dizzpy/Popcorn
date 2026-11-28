@@ -42,6 +42,7 @@
     "allow-player-set-subtitle",
     "allow-player-add-subtitle",
     "allow-player-toggle-fullscreen",
-    "allow-player-exit-fullscreen"
+    "allow-player-exit-fullscreen",
+    "allow-player-set-subtitle-lift"
   ]
 }

@@ -83,6 +83,12 @@ pub fn player_add_subtitle(app: AppHandle, host: State<'_, PlayerHost>) -> AppRe
     session.mpv.add_subtitle(&path)
 }
 
+/// Keeps subtitles clear of the controls while they are shown.
+#[tauri::command(async)]
+pub fn player_set_subtitle_lift(host: State<'_, PlayerHost>, fraction: f64) -> AppResult<()> {
+    host.require()?.mpv.set_subtitle_lift(fraction)
+}
+
 /// Sets full screen to `wanted(current)` on whichever window shows the video.
 /// Returns the state before and after.
 fn change_fullscreen(

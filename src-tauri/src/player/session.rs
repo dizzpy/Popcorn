@@ -18,6 +18,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::embed::{VideoSurface, WakeLock};
 use super::model::{self, PlaybackState, Throttle, Tracks};
 use super::mpv::{Event, EventReader, Mpv};
+use super::now_playing;
 use super::store;
 use super::tracker::{Save, Tracker};
 use super::PlayerHost;
@@ -451,7 +452,19 @@ impl EventLoop {
             volume: mpv.get_f64("volume").unwrap_or(100.0),
             muted: mpv.get_flag("mute"),
         };
-        self.keep_awake(!paused && !self.at_end);
+        let playing = !paused && !self.at_end;
+        self.keep_awake(playing);
+        // Also after a seek, which marks the state dirty: the widget only
+        // extrapolates, so every jump has to be told.
+        let progress = {
+            let tracker = lock(&self.session.tracker);
+            tracker
+                .position()
+                .map(|position| (position, tracker.duration()))
+        };
+        if let Some((position, duration)) = progress {
+            now_playing::update(self.session.file_id, position, duration, playing);
+        }
         if self.sent_state != Some(state) {
             self.sent_state = Some(state);
             self.session.emit(&self.app, "player://state", state);

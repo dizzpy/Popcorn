@@ -48,4 +48,5 @@ export const api = {
   playerAddSubtitle: () => invoke('player_add_subtitle'),
   playerToggleFullscreen: () => invoke('player_toggle_fullscreen'),
   playerExitFullscreen: () => invoke('player_exit_fullscreen'),
+  playerSetSubtitleLift: (fraction) => invoke('player_set_subtitle_lift', { fraction }),
 };

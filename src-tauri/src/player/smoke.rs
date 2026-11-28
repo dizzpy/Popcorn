@@ -83,6 +83,15 @@ fn report(app: &AppHandle, label: &str) {
     if let Some(surface) = session.surface() {
         log::info!("smoke [{label}] surface: {}", surface.describe(app));
     }
+    {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let _ = app.run_on_main_thread(move || {
+            let _ = sender.send(super::now_playing::describe());
+        });
+        if let Ok(text) = receiver.recv_timeout(Duration::from_secs(2)) {
+            log::info!("smoke [{label}] now playing: {text}");
+        }
+    }
     log::info!("smoke [{label}] keeping the display awake: {}", awake());
 }
 

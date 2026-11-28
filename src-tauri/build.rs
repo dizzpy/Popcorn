@@ -33,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "player_add_subtitle",
     "player_toggle_fullscreen",
     "player_exit_fullscreen",
+    "player_set_subtitle_lift",
 ];
 
 fn main() {
