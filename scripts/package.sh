@@ -30,6 +30,19 @@ rm -f "$DMG"
 # Check the app before spending time on the disk image.
 "$SCRIPTS/check-size.sh" "$APP"
 
+# hdiutil sometimes fails with "Resource busy" (exit 16) on CI machines, while
+# something else still holds the disk tools; trying again a little later works.
+retry_hdiutil() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    hdiutil "$@" && return 0
+    local status=$?
+    [[ "$attempt" == 5 ]] && return "$status"
+    echo "warning: hdiutil $1 failed (exit $status), retrying in $((attempt * 5))s" >&2
+    sleep $((attempt * 5))
+  done
+}
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/popcorn-dmg.XXXXXX")"
 STAGING="$WORK/staging"
 RW_DMG="$WORK/layout.dmg"
@@ -74,10 +87,10 @@ if [[ -d /Volumes/Popcorn ]]; then
     LAYOUT=0
   fi
 fi
-hdiutil create -volname Popcorn -srcfolder "$STAGING" -fs HFS+ -format UDRW \
+retry_hdiutil create -volname Popcorn -srcfolder "$STAGING" -fs HFS+ -format UDRW \
   -size "${SIZE_MB}m" -ov "$RW_DMG" >/dev/null
 # The device, not the path, identifies it: renaming changes the path.
-DEVICE="$(hdiutil attach "$RW_DMG" -readwrite -noverify -noautoopen | awk '/Apple_HFS/ { print $1 }')"
+DEVICE="$(retry_hdiutil attach "$RW_DMG" -readwrite -noverify -noautoopen | awk '/Apple_HFS/ { print $1 }')"
 
 MOUNT=/Volumes/Popcorn
 # Without Finder (some CI machines) the DMG still works, just unstyled.
@@ -124,8 +137,8 @@ hdiutil detach "$DEVICE" -quiet || hdiutil detach "$DEVICE" -quiet -force
 DEVICE=
 
 # ULMO (LZMA) is much smaller than UDZO and is readable since macOS 10.15.
-hdiutil convert "$RW_DMG" -format ULMO -ov -o "$DMG" >/dev/null
-hdiutil verify "$DMG"
+retry_hdiutil convert "$RW_DMG" -format ULMO -ov -o "$DMG" >/dev/null
+retry_hdiutil verify "$DMG"
 
 if [[ -n "${CODESIGN_IDENTITY:-}" && "$CODESIGN_IDENTITY" != "-" ]]; then
   codesign --force --sign "$CODESIGN_IDENTITY" --timestamp "$DMG"
