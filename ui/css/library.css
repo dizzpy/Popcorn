@@ -1,7 +1,8 @@
 /* Home (hero and rows), grids and search. */
 
 /* ───────── Hero carousel ───────── */
-.hero { position: relative; height: clamp(540px, 88vh, 880px); overflow: hidden; isolation: isolate; }
+/* The film strip's size, which the copy above it makes room for. */
+.hero { --thumb: 156px; --strip-bottom: clamp(96px, 13vh, 128px); --strip-height: calc(var(--thumb) * 9 / 16 + 44px); position: relative; height: clamp(560px, 90vh, 880px); overflow: hidden; isolation: isolate; }
 .slide { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity 1s ease, visibility 0s 1s; }
 .slide.active { opacity: 1; visibility: visible; transition: opacity 1s ease; }
 .slide > .art { position: absolute; inset: -3%; }
@@ -33,7 +34,7 @@
 
 /* Film strip: the carousel navigation. */
 .strip { position: absolute; z-index: 3; right: var(--pad); bottom: clamp(96px, 13vh, 128px); display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.strip-item { width: 156px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; color: var(--dim); transition: color .3s; }
+.strip-item { width: var(--thumb); padding: 0; border: 0; background: none; text-align: left; cursor: pointer; color: var(--dim); transition: color .3s; }
 .strip-item .thumb { aspect-ratio: 16 / 9; border-radius: var(--r-sm); opacity: .55; transition: opacity .3s, transform .3s var(--ease); box-shadow: 0 10px 30px -10px rgb(var(--c-black) / .6); }
 .strip-item:hover .thumb { opacity: .85; }
 .strip-item.active { color: var(--kernel); }
@@ -47,6 +48,17 @@
 @keyframes fill { from { width: 0; } to { width: 100%; } }
 .hero.paused :is(.fill, .hero-timer), .player-open .hero * { animation-play-state: paused !important; }
 .dots { display: none; }
+/* Narrower windows have no room for the copy beside the strip: the strip
+   shrinks and the copy moves up above it. */
+@media (max-width: 1679px) {
+  .hero { --thumb: clamp(100px, 9.5vw, 140px); }
+  .hero-copy { bottom: calc(var(--strip-bottom) + var(--strip-height) + 16px); }
+  .hero-title { font-size: clamp(52px, min(7.5vw, 10vh), 112px); margin-bottom: 18px; }
+  .hero-overview { -webkit-line-clamp: 2; margin-bottom: 22px; }
+}
+@media (max-width: 1679px) and (max-height: 720px) {
+  .hero-overview { display: none; }
+}
 
 /* ───────── Rows ───────── */
 .rows { position: relative; z-index: 2; padding-bottom: 64px; }
