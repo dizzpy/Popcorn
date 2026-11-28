@@ -6,7 +6,7 @@
 use std::process::Command;
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, DragDropEvent, Emitter, Manager, State, Window, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::db::metadata;
@@ -62,10 +62,86 @@ pub fn pick_media_folder(app: AppHandle, state: State<'_, AppState>) -> AppResul
         .ok()
         .and_then(|path| path.to_str().map(str::to_owned))
         .ok_or(AppError::FolderUnavailable)?;
-    settings::set(&state.db(), settings::MEDIA_FOLDER, &path)?;
-    jobs::start_watcher(&app)?;
-    jobs::start_scan(&app);
+    use_media_folder(&app, &state, &path)?;
     Ok(Some(path))
+}
+
+/// Saves the folder, then watches and scans it.
+fn use_media_folder(app: &AppHandle, state: &AppState, path: &str) -> AppResult<()> {
+    settings::set(&state.db(), settings::MEDIA_FOLDER, path)?;
+    jobs::start_watcher(app)?;
+    jobs::start_scan(app);
+    Ok(())
+}
+
+#[derive(Clone, Serialize)]
+struct DropPayload {
+    /// While dragging: whether something is over the window.
+    over: bool,
+    /// After a drop: the folder now in use.
+    path: Option<String>,
+    error: Option<String>,
+}
+
+/// A folder dragged onto the welcome screen becomes the media folder. It is
+/// taken from the native drop, so the web view never names a path; and only
+/// before onboarding is finished, so a stray drop later changes nothing.
+pub fn on_window_event(window: &Window, event: &WindowEvent) {
+    let WindowEvent::DragDrop(drag) = event else {
+        return;
+    };
+    let app = window.app_handle().clone();
+    let drag = drag.clone();
+    // Reading settings touches the database, which the main thread avoids.
+    std::thread::spawn(move || {
+        let state = app.state::<AppState>();
+        let onboarded = settings::get(&state.db(), settings::ONBOARDED)
+            .ok()
+            .flatten()
+            .is_some_and(|value| value == "1");
+        if onboarded {
+            return;
+        }
+        let payload = match drag {
+            DragDropEvent::Enter { .. } | DragDropEvent::Over { .. } => DropPayload {
+                over: true,
+                path: None,
+                error: None,
+            },
+            DragDropEvent::Leave => DropPayload {
+                over: false,
+                path: None,
+                error: None,
+            },
+            DragDropEvent::Drop { paths, .. } => dropped(&app, &state, &paths),
+            _ => return,
+        };
+        if let Err(error) = app.emit("onboarding://drop", payload) {
+            log::warn!("could not report the drop: {error}");
+        }
+    });
+}
+
+fn dropped(app: &AppHandle, state: &AppState, paths: &[std::path::PathBuf]) -> DropPayload {
+    let failed = |message: &str| DropPayload {
+        over: false,
+        path: None,
+        error: Some(message.to_owned()),
+    };
+    let Some(folder) = paths.iter().find(|path| path.is_dir()) else {
+        return failed("Drop a folder, not a file.");
+    };
+    let Some(path) = folder.to_str() else {
+        return failed("That folder cannot be opened.");
+    };
+    match use_media_folder(app, state, path) {
+        Ok(()) => DropPayload {
+            over: false,
+            path: Some(path.to_owned()),
+            error: None,
+        },
+        Err(error) => failed(&error.to_string()),
+    }
 }
 
 #[tauri::command(async)]
