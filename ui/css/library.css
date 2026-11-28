@@ -20,7 +20,13 @@
 .hero-copy { position: absolute; z-index: 2; left: var(--pad); bottom: clamp(150px, 22vh, 210px); width: min(620px, calc(100% - 2 * var(--pad))); }
 .hero-kicker { display: flex; gap: 10px; align-items: center; color: var(--smoke); font-size: 14px; margin-bottom: 14px; }
 .hero-kicker .kind { color: var(--butter); font-weight: 600; }
-.hero-title { font: 800 clamp(56px, 8vw, 128px)/.86 var(--display); font-stretch: condensed; letter-spacing: -.025em; margin: 0 0 22px; text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding-bottom: .06em; }
+.hero-title { font: 800 clamp(56px, 8vw, 128px)/.86 var(--display); font-stretch: condensed; letter-spacing: -.025em; margin: 0 0 22px; }
+.ht-main { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding-bottom: .06em; text-wrap: balance; }
+/* Long titles step down a size, so they fit in the three lines. */
+.ht-main.long { font-size: .8em; }
+.ht-main.xlong { font-size: .64em; line-height: .9; }
+/* The part after a colon, set smaller under the title like on a poster. */
+.ht-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: .16em; font-size: max(.3em, 22px); font-weight: 700; line-height: 1.08; letter-spacing: .05em; text-transform: uppercase; text-wrap: balance; color: rgb(var(--c-kernel) / .82); }
 .hero-copy .facts { margin-bottom: 16px; }
 .hero-overview { font-size: 17px; line-height: 1.55; color: rgb(var(--c-kernel) / .86); max-width: 52ch; margin: 0 0 28px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }

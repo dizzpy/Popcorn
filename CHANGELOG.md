@@ -26,6 +26,9 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A simpler welcome screen: choose or drop the media folder, watch the scan, and add a TMDB key
   only if you want to.
 - On Home, the featured text no longer runs into the film strip in smaller windows.
+- On Home, a long title with a colon shows its subtitle on a smaller line underneath, and long
+  titles get a smaller size instead of being cut off. Turn it off in Settings > Appearance.
+- Settings are grouped into cards, with a switch for the split titles.
 
 ## [0.1.0] - 2026-11-26
 

@@ -1,5 +1,6 @@
 import { api, errorMessage } from '../api.js';
-import { button, h } from '../dom.js';
+import { button, h, icon } from '../dom.js';
+import { pref, setPref } from '../prefs.js';
 import { state } from '../state.js';
 import { currentTheme, setTheme, THEME_CHANGED } from '../theme.js';
 import { attempt, toast } from '../components/toast.js';
@@ -22,8 +23,61 @@ function tmdbLogo() {
   return badge;
 }
 
-const group = (title, ...children) =>
-  h('section', { class: 'set-group' }, h('h2', { text: title }), children);
+/** A titled card of settings rows. */
+const group = (title, iconName, ...rows) =>
+  h(
+    'section',
+    { class: 'set-group' },
+    h('h2', {}, h('span', { class: 'set-ic' }, icon(iconName)), title),
+    h('div', { class: 'set-card' }, rows),
+  );
+
+/** An on/off switch. `onChange` gets the new value. */
+function toggle(label, on, focusKey, onChange) {
+  const el = h('button', {
+    type: 'button',
+    class: 'switch',
+    role: 'switch',
+    'aria-label': label,
+    dataset: { focusKey },
+    onClick: () => {
+      const next = el.getAttribute('aria-checked') !== 'true';
+      el.setAttribute('aria-checked', String(next));
+      onChange(next);
+    },
+  });
+  el.setAttribute('aria-checked', String(on));
+  return el;
+}
+
+/** The split-title switch, with a small preview of what it does. */
+function splitTitleSetting() {
+  const preview = h(
+    'div',
+    { class: 'set-preview', 'aria-hidden': 'true' },
+    h('span', { class: 'pv-main' }),
+    h('span', { class: 'pv-sub' }),
+  );
+  const paint = (on) => {
+    preview.classList.toggle('split', on);
+    preview.firstChild.textContent = on ? 'The Lord of the Rings' : 'The Lord of the Rings:';
+    preview.lastChild.textContent = on ? 'The Return of the King' : ' The Return of the King';
+  };
+  paint(pref('splitTitles'));
+  return setting(
+    'Split long titles',
+    h(
+      'span',
+      { class: 'set-note' },
+      'On Home, a title with a colon shows its subtitle on a smaller line underneath.',
+      preview,
+    ),
+    toggle('Split long titles', pref('splitTitles'), 'settings:split-titles', (on) => {
+      setPref('splitTitles', on);
+      paint(on);
+    }),
+  );
+}
 
 /** A labelled row with its controls on the right. */
 function setting(label, note, ...controls) {
@@ -169,10 +223,21 @@ export default {
       h(
         'div',
         { class: 'settings' },
-        h('h1', { class: 'page-title', text: 'Settings' }),
-        group('Appearance', setting('Theme', 'The video player always stays dark.', theme.el)),
+        h(
+          'header',
+          { class: 'set-head' },
+          h('h1', { class: 'page-title', text: 'Settings' }),
+          h('p', { class: 'set-lede', text: 'Your library, artwork and how Popcorn looks.' }),
+        ),
+        group(
+          'Appearance',
+          'sun',
+          setting('Theme', 'The video player always stays dark.', theme.el),
+          splitTitleSetting(),
+        ),
         group(
           'Library',
+          'folder',
           setting('Media folder', folder, changeFolder),
           setting(
             'Rescan library',
@@ -183,12 +248,17 @@ export default {
           ),
         ),
         group(
-          'TMDB',
+          'Metadata',
+          'wand',
           h(
             'div',
             { class: 'set-row stacked' },
-            h('b', { text: 'API key' }),
-            keyNote,
+            h(
+              'div',
+              { class: 'set-text' },
+              h('b', { text: 'TMDB API key' }),
+              keyNote,
+            ),
             key.el,
             link('Get a free TMDB API key', 'tmdb_api'),
           ),
@@ -207,7 +277,7 @@ export default {
             'Image cache',
             'Posters and backdrops stored on this Mac.',
             action(
-              'Clear image cache',
+              'Clear cache',
               'clear-cache',
               () => api.clearImageCache(),
               'Image cache cleared. Images will download again.',
@@ -217,10 +287,11 @@ export default {
         ),
         group(
           'About',
+          'info',
           setting(
             `Popcorn ${state.version}`.trim(),
             'Free and open source under GPL-3.0. Playback by mpv.',
-            link('Popcorn on GitHub', 'github'),
+            link('GitHub', 'github'),
             button('Show welcome screen', {
               variant: 'btn-quiet btn-sm',
               dataset: { focusKey: 'settings:welcome' },
@@ -229,7 +300,7 @@ export default {
           ),
           h(
             'div',
-            { class: 'attribution' },
+            { class: 'set-row attribution' },
             tmdbLogo(),
             h('span', { text: ATTRIBUTION }),
             link('themoviedb.org', 'tmdb'),

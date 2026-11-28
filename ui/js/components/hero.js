@@ -1,6 +1,7 @@
 // The featured carousel on Home, with a film strip to pick a slide.
 
 import { artwork, button, episodeCode, factList, formatRuntime, formatTime, h } from '../dom.js';
+import { pref } from '../prefs.js';
 
 function playLabel(play) {
   const code = play.season == null ? null : episodeCode(play.season, play.episode);
@@ -8,6 +9,41 @@ function playLabel(play) {
     return code ? `Resume ${code}` : `Resume from ${formatTime(play.resume_position)}`;
   }
   return code ? `Play ${code}` : 'Play';
+}
+
+/** Splits "Main: Subtitle" at the first colon, when the setting is on. */
+function titleParts(text) {
+  const at = text.indexOf(': ');
+  if (!pref('splitTitles') || at < 1) return { main: text, sub: null };
+  return { main: text.slice(0, at), sub: text.slice(at + 2).trim() || null };
+}
+
+/** Long titles get a smaller size, so they fit in three lines. */
+const sizeClass = (text) => (text.length > 28 ? 'xlong' : text.length > 16 ? 'long' : '');
+
+/** A single long word, like "Thunderbolts*", cannot wrap: shrink the line
+ * until it fits the width instead of cutting it off. */
+function fitWidth(el) {
+  el.style.fontSize = '';
+  // The clamped box hides the overflow from scrollWidth; measure the text.
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const widest = Math.max(0, ...[...range.getClientRects()].map((line) => line.width));
+  const over = widest / el.clientWidth;
+  if (over > 1.001) {
+    const size = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = `${Math.floor((size / over) * 0.98)}px`;
+  }
+}
+
+function heroTitle(text) {
+  const { main, sub } = titleParts(text);
+  return h(
+    'h1',
+    { class: 'hero-title', 'aria-label': text },
+    h('span', { class: `ht-main ${sizeClass(main)}`.trim(), text: main }),
+    sub && h('span', { class: 'ht-sub', text: sub }),
+  );
 }
 
 function slide(title, details, ctx) {
@@ -29,7 +65,7 @@ function slide(title, details, ctx) {
         h('span', { class: 'kind', text: show ? 'Series' : 'Film' }),
         h('span', { text: title.genres.slice(0, 3).join(', ') }),
       ),
-      h('h1', { class: 'hero-title', text: title.title }),
+      heroTitle(title.title),
       factList({ ...title, certification: details?.certification }, length),
       title.overview && h('p', { class: 'hero-overview', text: title.overview }),
       h(
@@ -116,6 +152,12 @@ export function hero(featured, ctx) {
     if (hadFocus) slides[index].querySelector('button')?.focus({ preventScroll: true });
   }
 
+  // The copy's width follows the window, so fit again when it changes.
+  const fitter = new ResizeObserver(() => {
+    for (const title of el.querySelectorAll('.ht-main, .ht-sub')) fitWidth(title);
+  });
+  fitter.observe(el);
+
   timer.addEventListener('animationend', () => go(index + 1));
   const pause = (on) => el.classList.toggle('paused', on);
   el.addEventListener('mouseenter', () => pause(true));
@@ -129,6 +171,9 @@ export function hero(featured, ctx) {
   return {
     el,
     step: (by) => go(index + by),
-    destroy: () => document.removeEventListener('visibilitychange', onVisibility),
+    destroy: () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      fitter.disconnect();
+    },
   };
 }
